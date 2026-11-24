@@ -1,48 +1,38 @@
-import torch
-from oracle import torch_sdpa
-import numpy as np
-import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+import torch
 
-def make_folder_and_file(file_str):
-    file_paths = []
-    folder_path = (f"{BASE_DIR}/fixtures/{file_str}")
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+from oracle.oracle import torch_sdpa
 
-    ary = ['q', 'K', 'V', 'expected']
 
-    for i in ary:
-
-        temp_path = (f"{BASE_DIR}/fixtures/{file_str}/{i}.bin")
-        if not os.path.exists(temp_path):
-            os.makedirs(temp_path)
-        file_paths.append(temp_path)
-
-    return file_paths
+BASE_DIR = Path(__file__).resolve().parent.parent
+FIXTURES_DIR = BASE_DIR / "fixtures"
 
 
 def get_tensors():
-
-    lengths_dims = [1, 100, 1024, 4097, 8192]
+    lengths = [1, 100, 1024, 4097, 8192]
     H, D = 32, 128
-    for length_L in lengths_dims:
 
-        file_str = 'len' + '_' + str(length_L)
-        file_paths = make_folder_and_file(file_str=file_str)
-
-        for i in file_paths:
-            print(i)
+    for length in lengths:
+        folder = FIXTURES_DIR / f"len_{length}"
+        folder.mkdir(parents=True, exist_ok=True)
 
         q = torch.randn(H, D, dtype=torch.float16)
-        K = torch.randn(H, length_L, D, dtype=torch.float16)
-        V = torch.randn(H, length_L, D, dtype=torch.float16)
+        K = torch.randn(H, length, D, dtype=torch.float16)
+        V = torch.randn(H, length, D, dtype=torch.float16)
 
         expected = torch_sdpa(q, K, V)
-        expected_numpy = expected.cpu().numpy()
 
-        
+        tensors = {
+            "q.bin": q,
+            "k.bin": K,
+            "v.bin": V,
+            "expected.bin": expected,
+        }
 
-get_tensors()
+        for filename, tensor in tensors.items():
+            tensor.detach().cpu().numpy().tofile(folder / filename)
+
+
+if __name__ == "__main__":
+    get_tensors()
