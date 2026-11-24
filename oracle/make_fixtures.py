@@ -33,6 +33,16 @@ def get_tensors():
         for filename, tensor in tensors.items():
             tensor.detach().cpu().numpy().tofile(folder / filename)
 
+        meta_file = FIXTURES_DIR / f"len_{length}"
+        folder.mkdir(parents=True, exist_ok=True)
+
+        with open(folder / "meta.txt", "w") as f:
+            for filename, tensor in tensors.items():
+                f.write(
+                    f"{filename}: shape={tuple(tensor.shape)}, "
+                    f"dtype={tensor.dtype}\n"
+                )
+
 
 if __name__ == "__main__":
     get_tensors()
