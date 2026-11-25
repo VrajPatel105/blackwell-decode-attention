@@ -1,0 +1,1 @@
+// validate the input is in expected shape  and then output the final one (both allocation and copy to gpu happens here)
