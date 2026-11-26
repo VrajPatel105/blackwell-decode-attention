@@ -14,6 +14,7 @@
 #include <io.cuh>
 #include <kernels.cuh>
 #include <utils.cuh>
+#include <compare.cuh>
 using namespace std;
 
 int main(){
@@ -42,7 +43,8 @@ int main(){
 
         CUDA_CHECK(cudaMemcpy(h_out.data(), d_o, f.expected.size() * sizeof(half), cudaMemcpyDeviceToHost));
 
-        // compare the two expected
+        CheckResult r = compare(h_out, f.expected);
+        cout << folder_name << ": " << (r.pass ? "PASS" : "FAIL") << "  max_err=" << r.max_abs_err << "  nan=" << r.num_nan << endl;
 
         cudaFree(d_q); cudaFree(d_K); cudaFree(d_V); cudaFree(d_o);
     }   
