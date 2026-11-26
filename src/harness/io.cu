@@ -75,10 +75,11 @@ Fixture load_fixture(const string& folder){
 }
 
 
-
+#ifdef IO_TEST
 int main() {
     Fixture f = load_fixture("fixtures/len_100");
     cout << f.H << " " << f.L << " " << f.D << "\n"
          << f.q.size() << " " << f.K.size() << " " << f.V.size() << " "
          << f.expected.size() << "\n";
 }
+#endif
