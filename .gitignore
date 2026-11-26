@@ -2,3 +2,4 @@ fixtures/
 venv/
 build/
 __pycache__/
+.vscode/

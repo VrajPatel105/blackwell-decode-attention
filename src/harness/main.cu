@@ -12,7 +12,8 @@
 #include <string>
 #include <cuda_fp16.h>
 #include <io.cuh>
-#include <format>
+#include <kernels.cuh>
+#include <utils.cuh>
 using namespace std;
 
 int main(){
@@ -22,32 +23,28 @@ int main(){
     for (const auto& folder_name : folder_vec) {
 
         Fixture f = load_fixture("fixtures/" + folder_name);
-
-        half *d_q, *d_K, *d_V;
-        float *d_expected;
-
-        if(cudaMalloc((void**)&d_q, f.q.size() * sizeof(half)) != cudaSuccess){
-            cout << "Unable to allocate memory for d_q" << endl;
-        }
-        if(cudaMalloc((void**)&d_K, f.K.size() * sizeof(half)) != cudaSuccess){
-            cout << "Unable to allocate memory for d_K" << endl;
-        }
-        if(cudaMalloc((void**)&d_V, f.V.size() * sizeof(half)) != cudaSuccess){
-            cout << "Unable to allocate memory for d_V" << endl;
-        }
-        if(cudaMalloc(&d_expected, f.expected.size() * sizeof(float)) != cudaSuccess){
-            cout << "Unable to allocate memory for d_expected" << endl;
-        }
-
-        cudaMemcpy(d_q, f.q.data(), f.q.size() * sizeof(half), cudaMemcpyHostToDevice);
-        cudaMemcpy(d_K, f.K.data(), f.K.size() * sizeof(half), cudaMemcpyHostToDevice);
-        cudaMemcpy(d_V, f.V.data(), f.V.size() * sizeof(half), cudaMemcpyHostToDevice);
-        cudaMemcpy(d_expected, f.expected.data(), f.expected.size() * sizeof(float), cudaMemcpyHostToDevice);
-
         
+        half *d_q, *d_K, *d_V, *d_o;
+        vector<half> h_out(f.expected.size()); 
 
+        CUDA_CHECK(cudaMalloc((void**)&d_q, f.q.size() * sizeof(half)));
+        CUDA_CHECK(cudaMalloc((void**)&d_K, f.K.size() * sizeof(half)));
+        CUDA_CHECK(cudaMalloc((void**)&d_V, f.V.size() * sizeof(half)));
+        CUDA_CHECK(cudaMalloc((void**)&d_o, f.expected.size() * sizeof(half)));
 
-        cudaFree(d_q); cudaFree(d_K); cudaFree(d_V); cudaFree(d_expected);
+        CUDA_CHECK(cudaMemcpy(d_q, f.q.data(), f.q.size() * sizeof(half), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(d_K, f.K.data(), f.K.size() * sizeof(half), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(d_V, f.V.data(), f.V.size() * sizeof(half), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemset(d_o, 0xFF, f.expected.size() * sizeof(half)));
+
+        decode_01_single_block_fp16(d_q, d_K, d_V, d_o, f.H, f.L, 0);
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        CUDA_CHECK(cudaMemcpy(h_out.data(), d_o, f.expected.size() * sizeof(half), cudaMemcpyDeviceToHost));
+
+        // compare the two expected
+
+        cudaFree(d_q); cudaFree(d_K); cudaFree(d_V); cudaFree(d_o);
     }   
 
 }
