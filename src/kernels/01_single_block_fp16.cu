@@ -98,7 +98,7 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
 
         // the shared memory have the scores (our indexing will make sure to avoid shared mem bank conflicts which is why isntead of going with contigous memory per thread, we went with this one !)
 
-        size_t total_iterations = ceil_div(seq_len, NUM_THREADS);
+        size_t total_iterations = ceil_div(seq_len, size_t(NUM_THREADS));
         float m = -INFINITY;
         for(size_t iteration = 0; iteration < total_iterations; iteration++){
             
@@ -188,8 +188,36 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
 
         __syncthreads();
 
-        
+        // final phase : scores * V : [100] [100,128] -> [128]
+        size_t col = tx % d_k;
+        size_t row_group = tx / d_k;
+        float acc = 0.0f;
 
+        int total_ph = ceil_div(seq_len, size_t(2));
+        for(size_t ph = 0; ph < total_ph; ph++){
+
+            size_t p = row_group + 2 * ph;
+
+            if(p < seq_len){
+                float w = scores[p];
+                float v = __half2float(V[k_v_offset + p * d_k + col]);
+                acc += w * v;
+            }
+
+        }
+
+        // now per col, there are 2 threads. they hold the partial sums. we now add them up 
+
+        if (row_group == 1) {
+            scores[seq_len + (NUM_THREADS / THREADS_PER_WARP) + tx - (NUM_THREADS / 2)] = acc;
+        }
+
+        __syncthreads();
+
+        if (row_group == 0) {
+            float final_sum = acc + scores[seq_len + (NUM_THREADS / THREADS_PER_WARP) + tx];
+            o[q_offset + tx] = __float2half(final_sum);
+        }
 
 
     }
@@ -201,7 +229,8 @@ void decode_01_single_block_fp16(const half* q, const half* K, const half* V, ha
     dim3 block(NUM_THREADS);
     size_t scores_smem_bytes = sizeof(float) * seq_len; // for scores shared mem
     size_t max_per_warp_bytes = sizeof(float) * (NUM_THREADS / THREADS_PER_WARP);
-    size_t shmem_bytes = scores_smem_bytes + max_per_warp_bytes;
+    size_t c_loop_bytes = sizeof(float) * d_k;
+    size_t shmem_bytes = scores_smem_bytes + max_per_warp_bytes + c_loop_bytes;
     decode_01<<<grid, block, shmem_bytes, stream>>>(q, K, V, o, num_heads, seq_len);
     CUDA_CHECK(cudaGetLastError());
 
