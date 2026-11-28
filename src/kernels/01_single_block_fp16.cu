@@ -9,8 +9,11 @@ namespace{
 constexpr int NUM_THREADS = 256;
 constexpr int ELE_PER_THREAD = 32; // total number of elements covered by one thread in that row
 constexpr int d_k = 128; // we are taking this as a constnat for this entire project since the fixtures follow d_k = 128
-    
+
     __global__ void decode_01(const half* q, const half* K, const half* V, half* o, size_t num_heads, size_t seq_len){
+
+
+        const float scale = rsqrtf((float)d_k); // for 1 / root d_k
     
         // we will use full mha. attention = Softmax ((q . k.T ) / root(d_k)) . V
         // I will partition this into three different execution layers.
@@ -39,6 +42,10 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
         size_t q_offset = bx * d_k;
         size_t k_v_offset = bx * d_k * seq_len;
 
+
+        // define the shared mem
+        extern __shared__ float scores[];
+
         // load the q values into registeres since the q val does not change across phases since it's 1d [128];
         size_t col_start = tx * ELE_PER_THREAD % d_k;
         float q_value_register[ELE_PER_THREAD];
@@ -65,6 +72,15 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
             
             }
 
+            // now there are 256 threads per phase and per warp 32. each warp now has total of 8 score values (8 rows) cuz we had 4 as the warp shuffle reduction
+            // so every thread at index 0, 4, 8, ... has the final acc for the row 0, 1, 2 ....
+            size_t row_start_within_head = ph * rows_per_phase + tx / (d_k / ELE_PER_THREAD);
+
+            if(tx % (d_k / ELE_PER_THREAD) == 0){
+                scores[row_start_within_head] = accu * scale;
+            }
+
+
         }
 
 
@@ -76,7 +92,8 @@ void decode_01_single_block_fp16(const half* q, const half* K, const half* V, ha
 
     dim3 grid(num_heads);
     dim3 block(NUM_THREADS);
-    decode_01<<<grid, block, 0, stream>>>(q, K, V, o, num_heads, seq_len);
+    size_t shmem_bytes = sizeof(float) * seq_len;
+    decode_01<<<grid, block, shmem_bytes, stream>>>(q, K, V, o, num_heads, seq_len);
     CUDA_CHECK(cudaGetLastError());
 
 }
