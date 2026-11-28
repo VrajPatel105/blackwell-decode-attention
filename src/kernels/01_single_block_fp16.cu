@@ -176,6 +176,21 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
 
         __syncthreads();
 
+        // step 4 final one : num / den. which is overriding the values in the smem to new smem[val] / final_denominator_scalar
+        
+        for(size_t iteration = 0; iteration < total_iterations; iteration++){
+
+            if( (iteration * NUM_THREADS + tx ) < seq_len){
+                scores[iteration * NUM_THREADS + tx ] = scores[iteration * NUM_THREADS + tx] / final_denominator_scalar;
+            }
+
+        }
+
+        __syncthreads();
+
+        
+
+
 
     }
 } // namespace
