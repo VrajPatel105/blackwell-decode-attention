@@ -1,6 +1,7 @@
 #include "kernels.cuh"
 #include "utils.cuh"
 #include <cuda_fp16.h>
+#include <cmath>
 
 
 namespace{
@@ -139,6 +140,42 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
         }
 
         __syncthreads();
+
+
+        // part 2 : the numerator = exponent(scores[p] - m)
+        // part 3 as well. we can just combine part 2 and 3 together. 
+        float running_sum = 0.0f; // denominator
+        for(size_t iteration = 0; iteration < total_iterations; iteration++){
+
+            if( (iteration * NUM_THREADS + tx ) < seq_len){
+                float new_score = expf(scores[iteration * NUM_THREADS + tx] - m);
+                scores[iteration * NUM_THREADS + tx ] = new_score;
+                running_sum += new_score;
+            }
+
+        }
+
+        // now each thread has running_sum but it's still partial. so we again apply the same thread shuffling.
+        
+        for(int offset = 16; offset > 0; offset /= 2){
+            running_sum += __shfl_down_sync(FULL_MASK, running_sum, offset);
+        }
+
+        size_t running_sum_smem_index = seq_len + tx / THREADS_PER_WARP; // we will override the previous shared mem 
+
+        if((tx % THREADS_PER_WARP) == 0 && running_sum_smem_index < ( seq_len + THREADS_PER_WARP)){
+            scores[running_sum_smem_index] = running_sum;
+        }
+
+        __syncthreads();
+
+        float final_denominator_scalar = 0;
+        for(size_t idx = 0; idx < (NUM_THREADS / THREADS_PER_WARP); idx++){
+            final_denominator_scalar += scores[seq_len + idx];
+        }
+
+        __syncthreads();
+
 
     }
 } // namespace
