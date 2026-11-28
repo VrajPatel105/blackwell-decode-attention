@@ -63,7 +63,9 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
 
             float accu = 0.0f;
             for(size_t k = 0; k < ELE_PER_THREAD; k++){
-                accu += q_value_register[k] * __half2float(K[k_address + k]);
+                if(k_address + k < (k_v_offset + d_k * seq_len)){
+                    accu += q_value_register[k] * __half2float(K[k_address + k]);
+                }
             }
 
             for(int offset = 2; offset > 0; offset--){
@@ -76,7 +78,7 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
             // so every thread at index 0, 4, 8, ... has the final acc for the row 0, 1, 2 ....
             size_t row_start_within_head = ph * rows_per_phase + tx / (d_k / ELE_PER_THREAD);
 
-            if(tx % (d_k / ELE_PER_THREAD) == 0){
+            if(tx % (d_k / ELE_PER_THREAD) == 0 && row_start_within_head < seq_len){
                 scores[row_start_within_head] = accu * scale;
             }
 
