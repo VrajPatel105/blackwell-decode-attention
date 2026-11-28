@@ -5,6 +5,7 @@
 
 namespace{
 
+#define FULL_MASK 0xffffffff
 constexpr int NUM_THREADS = 256;
 constexpr int ELE_PER_THREAD = 32; // total number of elements covered by one thread in that row
 constexpr int d_k = 128; // we are taking this as a constnat for this entire project since the fixtures follow d_k = 128
@@ -48,10 +49,21 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
 
         for(int ph = 0; ph < phases; ph++){
 
-            const size_t row = (ph * ELE_PER_THREAD * NUM_THREADS + tx * ELE_PER_THREAD) / d_k;
+            const size_t row = ph * ELE_PER_THREAD * NUM_THREADS + tx * ELE_PER_THREAD;
 
+            // the main accumulator loop for k and v
+            size_t k_address = k_v_offset + row;
 
+            float accu = 0.0f;
+            for(size_t k = 0; k < ELE_PER_THREAD; k++){
+                accu += q_value_register[k] * __half2float(K[k_address + k]);
+            }
 
+            for(int offset = 2; offset > 0; offset--){
+                
+                accu += __shfl_down_sync(FULL_MASK, accu, offset);
+            
+            }
 
         }
 
