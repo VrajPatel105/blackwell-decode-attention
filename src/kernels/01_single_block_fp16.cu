@@ -34,17 +34,23 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
 
         size_t rows_per_phase = NUM_THREADS / (d_k / ELE_PER_THREAD); // 256 / (128 / 32) = 256 / 4 = 64
         size_t phases = ceil_div(seq_len, rows_per_phase); // 100 / 64  = 1 phases (threads / elements per thread)
+        
+        size_t q_offset = bx * d_k;
+        size_t k_v_offset = bx * d_k * seq_len;
+
+        // load the q values into registeres since the q val does not change across phases since it's 1d [128];
+        size_t col_start = tx * ELE_PER_THREAD % d_k;
+        float q_value_register[ELE_PER_THREAD];
+
+        for(int q_ele = 0; q_ele < ELE_PER_THREAD; q_ele++){
+            q_value_register[q_ele] = __half2float(q[q_offset + col_start + q_ele]);
+        }
+
         for(int ph = 0; ph < phases; ph++){
 
-            size_t q_offset = bx * d_k;
-            size_t k_v_offset = bx * d_k * seq_len;
-
-            const int row = (k_v_offset + ph * ELE_PER_THREAD * NUM_THREADS + tx * ELE_PER_THREAD) / d_k;
-
-            
+            const size_t row = (ph * ELE_PER_THREAD * NUM_THREADS + tx * ELE_PER_THREAD) / d_k;
 
 
-            // now we load the q values in the register themselves.
 
 
         }
