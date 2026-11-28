@@ -233,3 +233,11 @@ void decode_01_single_block_fp16(const half* q, const half* K, const half* V, ha
     CUDA_CHECK(cudaGetLastError());
 
 }
+
+// results : (all passed in just one go! heheheheh :0 )
+// (venv) vraj@Vraj:/mnt/c/dev/projects/blackwell-decode-attention$ ./build/decode
+// len_1: PASS  max_err=0  nan=0
+// len_100: PASS  max_err=0.00022763  nan=0
+// len_1024: PASS  max_err=9.09865e-05  nan=0
+// len_4097: PASS  max_err=2.99141e-05  nan=0
+// len_8192: PASS  max_err=2.20686e-05  nan=0

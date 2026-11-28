@@ -16,6 +16,8 @@ add_executable(decode
   src/harness/main.cu
   src/harness/io.cu
   src/harness/compare.cu
+  src/harness/timing.cu
+  src/harness/ceiling.cu
   ${KERNEL_SRCS})
 target_include_directories(decode PRIVATE include)
 target_compile_options(decode PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
