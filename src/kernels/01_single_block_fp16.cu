@@ -8,7 +8,7 @@ namespace{
 
 #define FULL_MASK 0xffffffff
 constexpr int NUM_THREADS = 256;
-constexpr int ELE_PER_THREAD = 32; // total number of elements covered by one thread in that row
+constexpr int ELE_PER_THREAD = 32;
 constexpr int THREADS_PER_WARP = 32;
 constexpr int d_k = 128; // we are taking this as a constnat for this entire project since the fixtures follow d_k = 128
 
@@ -16,11 +16,9 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
 
         
         const float scale = rsqrtf((float)d_k); // for 1 / root d_k
+
         // define the shared mem
         extern __shared__ float scores[];
-        // we will use full mha. attention = Softmax ((q . k.T ) / root(d_k)) . V
-        // I will partition this into three different execution layers.
-        // first one will be writing the q . k.T multiplication
 
         // q is [32, 128]
         // K is [32, 100, 128] // considering that the length is 100 for now to keep it simple
@@ -39,7 +37,7 @@ constexpr int d_k = 128; // we are taking this as a constnat for this entire pro
         // q = [128], K = [100, 128], V = [100, 128]
 
         size_t rows_per_phase = NUM_THREADS / (d_k / ELE_PER_THREAD); // 256 / (128 / 32) = 256 / 4 = 64
-        size_t phases = ceil_div(seq_len, rows_per_phase); // 100 / 64  = 1 phases (threads / elements per thread)
+        size_t phases = ceil_div(seq_len, rows_per_phase); // for example : 100 / 64  = 1 phases (threads / elements per thread)
         
         size_t q_offset = bx * d_k;
         size_t k_v_offset = bx * d_k * seq_len;
